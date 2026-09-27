@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>微透镜侦探 — 引力微透镜光变曲线互动演示</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>微透镜侦探 <span>Microlensing Detective</span></h1>
+    <p class="sub">拖动滑块改变透镜系统 → 观看光变曲线与 mock 观测的实时变化</p>
+    <button id="btn-puzzle" class="btn">🎯 谜题挑战（高级）</button>
+    <button id="btn-gallery" class="btn">📖 知识卡 <span id="gallery-count">0 / 6</span></button>
+  </header>
+
+  <main class="grid">
+    <section class="col">
+      <div class="panel">
+        <h3>透镜系统视图（源平面 ∪ 像平面，单位 R_E）</h3>
+        <canvas id="system-canvas" width="680" height="620"></canvas>
+      </div>
+      <div class="panel">
+        <h3>物理原理</h3>
+        <div id="regime-text" class="regime"></div>
+        <div class="kv-grid">
+          <div class="kv"><span>当前角间距 u</span><b id="readout-u">—</b></div>
+          <div class="kv"><span>放大率 A</span><b id="readout-a">—</b></div>
+          <div class="kv"><span>像的数目</span><b id="readout-nimg">—</b></div>
+        </div>
+        <div id="readout-params" class="params-note"></div>
+      </div>
+    </section>
+
+    <section class="col">
+      <div class="panel">
+        <h3>光变曲线 + Mock 观测（σ = 2%，天气随机缺数）</h3>
+        <canvas id="curve-canvas" width="680" height="430"></canvas>
+        <div class="controls">
+          <button id="btn-play" class="btn primary">▶ 播放观测</button>
+          <button id="btn-rewind" class="btn">⏮ 回到起点</button>
+          <div id="speed-group" class="speed-group">
+            <button class="btn speed" data-v="8">1×</button>
+            <button class="btn speed" data-v="24">3×</button>
+            <button class="btn speed" data-v="80">10×</button>
+          </div>
+          <button id="btn-reset" class="btn">🌤 重新生成天气</button>
+        </div>
+        <div id="puzzle-bar" class="puzzle-bar hidden">
+          <div class="puzzle-actions">
+            <button id="btn-reveal" class="btn primary">✅ 公布答案</button>
+            <button id="btn-next" class="btn">🔄 下一题</button>
+            <span id="chi2-readout" class="chi2">—</span>
+          </div>
+          <div id="verdict-box" class="verdict-box"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>参数控制台</h3>
+        <div class="slider-row">
+          <label>t₀ 峰值时刻</label>
+          <input id="slider-t0" type="range" min="30" max="150" step="0.5" value="90">
+          <span id="val-t0">90 天</span>
+        </div>
+        <div class="slider-row">
+          <label>u_min 最小间距</label>
+          <input id="slider-umin" type="range" min="0.02" max="1.5" step="0.01" value="0.05">
+          <span id="val-umin">0.05 R_E</span>
+        </div>
+        <div class="slider-row">
+          <label>t_E 爱因斯坦时间</label>
+          <input id="slider-te" type="range" min="5" max="100" step="1" value="30">
+          <span id="val-te">30 天</span>
+        </div>
+        <div class="slider-row">
+          <label>f_s 源流量占比</label>
+          <input id="slider-fs" type="range" min="0.1" max="1" step="0.01" value="1">
+          <span id="val-fs">1.00</span>
+        </div>
+        <div class="slider-row">
+          <label>q 行星/伴星质量比</label>
+          <input id="slider-q" type="range" min="0" max="1" step="0.001" value="0.369">
+          <span id="val-q">0.003</span>
+        </div>
+        <div class="slider-row" id="row-s">
+          <label>s 投影分离度</label>
+          <input id="slider-s" type="range" min="0.4" max="3" step="0.01" value="1.2">
+          <span id="val-s">1.20 R_E</span>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>观测日志</h3>
+        <div id="event-log" class="event-log"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footnote">
+    演示模型：1L1S 用 Paczyński 解析解；1L2S 用五次复多项式（Durand–Kerner 求解，monic 归一 + Newton 精修 + 假根过滤）。
+    点源近似、放大率上限 1000；观测噪声 σ = 2%·√F，天气缺数率 18%。谜题模式：拟合隐藏的透镜系统，χ²/dof → 1 即完美吻合。
+  </footer>
+
+  <div id="modal-gallery" class="modal hidden">
+    <div class="modal-inner">
+      <div class="modal-head"><b>📖 知识卡图鉴</b><button id="btn-gallery-close" class="btn small">✕</button></div>
+      <div id="gallery-list" class="gallery-list"></div>
+    </div>
+  </div>
+
+  <div id="toast-area" class="toast-area"></div>
+
+  <script src="js/physics.js"></script>
+  <script src="js/knowledge.js"></script>
+  <script src="js/puzzle.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
