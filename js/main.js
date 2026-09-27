@@ -174,7 +174,7 @@ const App = {
     ev.p = displayP;
 
     this.sysView.setParams(displayP);
-    this.sysView.draw(displayP, ev);
+    this.sysView.draw(displayP, ev, ts);
     this.curveView.draw({ t: this.t });
 
     if (ts - this.lastReadout > 150) {

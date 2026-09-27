@@ -9,7 +9,7 @@
 <body>
   <header class="topbar">
     <h1>微透镜侦探 <span>Microlensing Detective</span></h1>
-    <p class="sub">拖动滑块改变透镜系统 → 观看光变曲线与 mock 观测的实时变化</p>
+    <p class="sub">左侧看光路如何被弯曲 → 右侧看光变如何被记录</p>
     <button id="btn-puzzle" class="btn">🎯 谜题挑战（高级）</button>
     <button id="btn-gallery" class="btn">📖 知识卡 <span id="gallery-count">0 / 6</span></button>
   </header>
@@ -17,8 +17,8 @@
   <main class="grid">
     <section class="col">
       <div class="panel">
-        <h3>透镜系统视图（源平面 ∪ 像平面，单位 R_E）</h3>
-        <canvas id="system-canvas" width="680" height="620"></canvas>
+        <h3>光路与透镜系统（单位 R_E，OGLE 风格示意）</h3>
+        <canvas id="system-canvas" width="680" height="640"></canvas>
       </div>
       <div class="panel">
         <h3>物理原理</h3>
@@ -35,7 +35,7 @@
     <section class="col">
       <div class="panel">
         <h3>光变曲线 + Mock 观测（σ = 2%，天气随机缺数）</h3>
-        <canvas id="curve-canvas" width="680" height="430"></canvas>
+        <canvas id="curve-canvas" width="620" height="440"></canvas>
         <div class="controls">
           <button id="btn-play" class="btn primary">▶ 播放观测</button>
           <button id="btn-rewind" class="btn">⏮ 回到起点</button>
@@ -56,7 +56,14 @@
         </div>
       </div>
       <div class="panel">
-        <h3>参数控制台</h3>
+        <h3>观测日志</h3>
+        <div id="event-log" class="event-log"></div>
+      </div>
+    </section>
+
+    <section class="col side-col">
+      <div class="panel">
+        <h3>参数调整栏</h3>
         <div class="slider-row">
           <label>t₀ 峰值时刻</label>
           <input id="slider-t0" type="range" min="30" max="150" step="0.5" value="90">
@@ -89,15 +96,23 @@
         </div>
       </div>
       <div class="panel">
-        <h3>观测日志</h3>
-        <div id="event-log" class="event-log"></div>
+        <h3>图例</h3>
+        <ul class="legend-list">
+          <li><span class="dot src"></span>源星（背景恒星）</li>
+          <li><span class="dot img"></span>源的像（蓝）</li>
+          <li><span class="dot lens"></span>透镜 ×（不可见）</li>
+          <li><span class="dot ring"></span>爱因斯坦环 R_E</li>
+          <li><span class="dot cau"></span>焦散线（双透镜）</li>
+          <li><span class="dot ray"></span>弯曲光线 → 🔭 观测者</li>
+        </ul>
+        <p class="tip">u 越小，光线弯折越强，源被放大得越亮；双透镜的焦散线会让放大率剧烈跳变。</p>
       </div>
     </section>
   </main>
 
   <footer class="footnote">
     演示模型：1L1S 用 Paczyński 解析解；1L2S 用五次复多项式（Durand–Kerner 求解，monic 归一 + Newton 精修 + 假根过滤）。
-    点源近似、放大率上限 1000；观测噪声 σ = 2%·√F，天气缺数率 18%。谜题模式：拟合隐藏的透镜系统，χ²/dof → 1 即完美吻合。
+    点源近似、放大率上限 1000；观测噪声 σ = 2%·√F，天气缺数率 18%。光线弯曲为示意画法（真实偏折角 ~ 毫角秒量级）。
   </footer>
 
   <div id="modal-gallery" class="modal hidden">
