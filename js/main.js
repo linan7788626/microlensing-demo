@@ -7,7 +7,7 @@ const App = {
   puzzle: null,
   t: 0,
   prevT: 0,
-  playing: true,
+  playing: false,
   speed: 8,
   slots: null,
   model: null,
@@ -184,7 +184,7 @@ const App = {
     ev.p = displayP;
 
     this.sysView.setParams(displayP);
-    this.sysView.draw(displayP, ev, ts);
+    this.sysView.draw(displayP, ev, this.playing ? ts : 0);
     this.findingView.draw(displayP.uMin);
     this.curveView.draw({ t: this.t });
 
