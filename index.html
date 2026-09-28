@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>微透镜侦探 — 引力微透镜光变曲线互动演示</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=4">
 </head>
 <body>
   <header class="topbar">
@@ -15,30 +15,19 @@
   </header>
 
   <main class="grid">
-    <section class="col">
+    <section class="col main-col">
       <div class="panel">
-        <h3>光路与透镜系统（单位 R_E，OGLE 风格示意）</h3>
-        <canvas id="system-canvas" width="680" height="640"></canvas>
+        <h3>光路与透镜系统（源居中 · 单位 R_E）</h3>
+        <canvas id="system-canvas" width="640" height="640"></canvas>
       </div>
-      <div class="panel">
-        <h3>物理原理</h3>
-        <div id="regime-text" class="regime"></div>
-        <div class="kv-grid">
-          <div class="kv"><span>当前角间距 u</span><b id="readout-u">—</b></div>
-          <div class="kv"><span>放大率 A</span><b id="readout-a">—</b></div>
-          <div class="kv"><span>像的数目</span><b id="readout-nimg">—</b></div>
-        </div>
-        <div id="readout-params" class="params-note"></div>
-      </div>
-    </section>
-
-    <section class="col">
       <div class="panel">
         <h3>光变曲线 + Mock 观测（σ = 2%，天气随机缺数）</h3>
         <canvas id="curve-canvas" width="620" height="440"></canvas>
+        <div id="event-meta" class="event-meta"></div>
         <div class="controls">
           <button id="btn-play" class="btn primary">▶ 播放观测</button>
           <button id="btn-rewind" class="btn">⏮ 回到起点</button>
+          <button id="btn-full" class="btn">📷 完整事件</button>
           <div id="speed-group" class="speed-group">
             <button class="btn speed" data-v="8">1×</button>
             <button class="btn speed" data-v="24">3×</button>
@@ -55,29 +44,38 @@
           <div id="verdict-box" class="verdict-box"></div>
         </div>
       </div>
-      <div class="panel">
-        <h3>观测日志</h3>
-        <div id="event-log" class="event-log"></div>
-      </div>
     </section>
 
     <section class="col side-col">
       <div class="panel">
+        <h3>图像视图 · 目标天区</h3>
+        <div class="finding-row">
+          <canvas id="finding-canvas" width="280" height="220"></canvas>
+          <div class="finding-info">
+            <div class="finding-title">OGLE 2003-BLG-235 / MOA 2003-BLG-53<span>（示意）</span></div>
+            <div class="finding-line"><b>天区</b> RA 17h 56m · Dec −29° 32′（银心方向）</div>
+            <div class="finding-line"><b>绿圈</b> 投影爱因斯坦环 ≈ <span id="ring-arcsec">—</span></div>
+            <div class="finding-line"><b>基线星等</b> I ≈ 17.8（参考）</div>
+            <div class="finding-tip">微透镜巡天靠每天比较同一片星场里几万颗星的亮度来"报警"。</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
         <h3>参数调整栏</h3>
         <div class="slider-row">
           <label>t₀ 峰值时刻</label>
-          <input id="slider-t0" type="range" min="30" max="150" step="0.5" value="90">
-          <span id="val-t0">90 天</span>
+          <input id="slider-t0" type="range" min="30" max="150" step="0.5" value="80">
+          <span id="val-t0">80 天</span>
         </div>
         <div class="slider-row">
           <label>u_min 最小间距</label>
-          <input id="slider-umin" type="range" min="0.02" max="1.5" step="0.01" value="0.05">
-          <span id="val-umin">0.05 R_E</span>
+          <input id="slider-umin" type="range" min="0.02" max="1.5" step="0.01" value="0.15">
+          <span id="val-umin">0.15 R_E</span>
         </div>
         <div class="slider-row">
           <label>t_E 爱因斯坦时间</label>
-          <input id="slider-te" type="range" min="5" max="100" step="1" value="30">
-          <span id="val-te">30 天</span>
+          <input id="slider-te" type="range" min="5" max="100" step="1" value="25">
+          <span id="val-te">25 天</span>
         </div>
         <div class="slider-row">
           <label>f_s 源流量占比</label>
@@ -86,14 +84,28 @@
         </div>
         <div class="slider-row">
           <label>q 行星/伴星质量比</label>
-          <input id="slider-q" type="range" min="0" max="1" step="0.001" value="0.369">
-          <span id="val-q">0.003</span>
+          <input id="slider-q" type="range" min="0" max="1" step="0.001" value="0">
+          <span id="val-q">单透镜</span>
         </div>
         <div class="slider-row" id="row-s">
           <label>s 投影分离度</label>
           <input id="slider-s" type="range" min="0.4" max="3" step="0.01" value="1.2">
-          <span id="val-s">1.20 R_E</span>
+          <span id="val-s">—</span>
         </div>
+      </div>
+      <div class="panel">
+        <h3>物理原理</h3>
+        <div id="regime-text" class="regime"></div>
+        <div class="kv-grid">
+          <div class="kv"><span>当前角间距 u</span><b id="readout-u">—</b></div>
+          <div class="kv"><span>放大率 A</span><b id="readout-a">—</b></div>
+          <div class="kv"><span>像的数目</span><b id="readout-nimg">—</b></div>
+        </div>
+        <div id="readout-params" class="params-note"></div>
+      </div>
+      <div class="panel">
+        <h3>观测日志</h3>
+        <div id="event-log" class="event-log"></div>
       </div>
       <div class="panel">
         <h3>图例</h3>
@@ -102,7 +114,8 @@
           <li><span class="dot img"></span>源的像（蓝）</li>
           <li><span class="dot lens"></span>透镜 ×（不可见）</li>
           <li><span class="dot ring"></span>爱因斯坦环 R_E</li>
-          <li><span class="dot cau"></span>焦散线（双透镜）</li>
+          <li><span class="dot cau"></span>焦散线（源平面，双透镜）</li>
+          <li><span class="dot crit"></span>临界曲线（像平面，双透镜）</li>
           <li><span class="dot ray"></span>弯曲光线 → 🔭 观测者</li>
         </ul>
         <p class="tip">u 越小，光线弯折越强，源被放大得越亮；双透镜的焦散线会让放大率剧烈跳变。</p>
@@ -124,11 +137,11 @@
 
   <div id="toast-area" class="toast-area"></div>
 
-  <script src="js/physics.js"></script>
-  <script src="js/knowledge.js"></script>
-  <script src="js/puzzle.js"></script>
-  <script src="js/render.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/physics.js?v=5"></script>
+  <script src="js/knowledge.js?v=5"></script>
+  <script src="js/puzzle.js?v=5"></script>
+  <script src="js/render.js?v=5"></script>
+  <script src="js/ui.js?v=5"></script>
+  <script src="js/main.js?v=5"></script>
 </body>
 </html>

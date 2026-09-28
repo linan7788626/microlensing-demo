@@ -4,6 +4,7 @@ const COL = {
   grid: '#1c2740',
   ring: '#8b9bb4',
   caustic: '#f472b6',
+  crit: '#a78bfa',
   lens: '#cbd5e1',
   track: '#334155',
   source: '#fbbf24',
@@ -11,10 +12,13 @@ const COL = {
   model: '#38bdf8',
   truth: '#4ade80',
   data: '#e2e8f0',
+  dataFuture: 'rgba(226,232,240,0.22)',
   now: '#fbbf24',
   ray: 'rgba(125,211,252,0.35)',
   text: '#94a3b8',
   textBright: '#cbd5e1',
+  alert: '#f87171',
+  silhouette: 'rgba(56,189,248,0.10)',
 };
 
 function setupCanvas(canvas) {
@@ -76,13 +80,14 @@ class SystemView {
       this.causticKey = key;
       this.causticCache = window.MLPHYS.causticSegments(p, 220);
     }
-    this.half = Math.max(1.6, p.s + 1.2, p.uMin + 0.6, 2.2);
+    const trajMax = Math.max(p.t0 / p.tE, (window.MLPHYS.SEASON_DAYS - p.t0) / p.tE);
+    this.half = Math.min(12, Math.max(1.6, p.s + 1.2, p.uMin + 0.6, 2.2, trajMax + 1.2));
   }
 
   draw(p, evalRes, ts = 0) {
     const { ctx, w, h } = setupCanvas(this.canvas);
     const half = this.half;
-    const cx = w / 2, cy = h * 0.44;
+    const cx = w / 2, cy = h / 2;
     const k = Math.min(w, h) / (2 * half);
     const X = (x) => cx + x * k;
     const Y = (y) => cy - y * k;
@@ -100,13 +105,27 @@ class SystemView {
 
     ctx.strokeStyle = 'rgba(30,41,64,0.6)';
     ctx.lineWidth = 1;
-    for (let g = -Math.ceil(half); g <= Math.ceil(half); g++) {
+    const gStep = half > 4.5 ? 2 : 1;
+    const gMax = Math.floor(half / gStep) * gStep;
+    for (let g = -gMax; g <= gMax; g += gStep) {
       ctx.beginPath(); ctx.moveTo(X(g), 0); ctx.lineTo(X(g), h); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, Y(g)); ctx.lineTo(w, Y(g)); ctx.stroke();
     }
 
-    const src = { x: X(evalRes.zeta.re), y: Y(evalRes.zeta.im) };
-    const lens = { x: X(0), y: Y(0) };
+    ctx.strokeStyle = 'rgba(251,191,36,0.16)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, h); ctx.stroke();
+    ctx.fillStyle = 'rgba(251,191,36,0.4)';
+    ctx.font = '10px sans-serif';
+    ctx.fillText('光轴（视线）', cx + 4, 14);
+
+    const zeta = evalRes.zeta;
+    const TX = (x) => X(zeta.re - x);
+    const TY = (y) => Y(y - zeta.im);
+
+    const src = { x: X(0), y: Y(0) };
+    const lens = { x: TX(0), y: TY(0) };
     const obs = { x: cx, y: h - 16 };
 
     ctx.setLineDash([5, 5]);
@@ -116,38 +135,62 @@ class SystemView {
     ctx.setLineDash([]);
     ctx.fillStyle = COL.text;
     ctx.font = '12px sans-serif';
-    ctx.fillText('爱因斯坦环 R_E', lens.x + k * 0.7, lens.y - k * 0.74);
+    ctx.fillText('爱因斯坦环 R_E', Math.max(6, Math.min(lens.x + k * 0.55, w - 122)), lens.y - k * 0.78);
 
     if (p.q > 0 && this.causticCache && this.causticCache.segs.length) {
       ctx.strokeStyle = COL.caustic;
       ctx.lineWidth = 1.8;
       ctx.beginPath();
       for (const s of this.causticCache.segs) {
-        ctx.moveTo(X(s.x1), Y(s.y1));
-        ctx.lineTo(X(s.x2), Y(s.y2));
+        ctx.moveTo(TX(s.x1), TY(s.y1));
+        ctx.lineTo(TX(s.x2), TY(s.y2));
       }
       ctx.stroke();
       ctx.fillStyle = COL.caustic;
-      ctx.fillText('焦散线', 12, 20);
+      ctx.fillText('焦散线（源平面）', 12, 20);
     }
 
-    const tauMin = -cx / k, tauMax = (w - cx) / k;
+    if (p.q > 0 && this.causticCache && this.causticCache.critSegs.length) {
+      ctx.strokeStyle = COL.crit;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      for (const s of this.causticCache.critSegs) {
+        ctx.moveTo(TX(s.x1), TY(s.y1));
+        ctx.lineTo(TX(s.x2), TY(s.y2));
+      }
+      ctx.stroke();
+      ctx.fillStyle = COL.crit;
+      ctx.fillText('临界曲线（像平面 J=0）', 12, 36);
+    }
+
+    const trajY = TY(0);
     ctx.strokeStyle = 'rgba(71,85,105,0.8)';
     ctx.lineWidth = 1.4;
     ctx.beginPath();
-    ctx.moveTo(X(tauMin), Y(p.uMin));
-    ctx.lineTo(X(tauMax), Y(p.uMin));
+    ctx.moveTo(0, trajY);
+    ctx.lineTo(w, trajY);
     ctx.stroke();
+    ctx.fillStyle = 'rgba(100,116,139,0.9)';
+    const ax = w - 34;
+    ctx.beginPath();
+    ctx.moveTo(ax, trajY - 4);
+    ctx.lineTo(ax, trajY + 4);
+    ctx.lineTo(ax + 9, trajY);
+    ctx.closePath();
+    ctx.fill();
     ctx.fillStyle = COL.text;
-    ctx.fillText('源轨迹', 12, h - 52);
+    ctx.fillText(`透镜轨迹（u_min = ${p.uMin.toFixed(2)} R_E）`, 12, trajY - 8);
 
+    const bendAmt = Math.max(0, Math.min(1, (2.2 - evalRes.u) / 1.2));
     const offPx = Math.min(1.05, 0.3 + 0.55 / Math.max(evalRes.u, 0.3)) * k;
     const dx = obs.x - src.x, dy = obs.y - src.y;
     const dl = Math.hypot(dx, dy) || 1;
     const px = -dy / dl, py = dx / dl;
+    const mid = { x: (src.x + obs.x) / 2, y: (src.y + obs.y) / 2 };
     const rays = [];
     for (const side of [1, -1]) {
-      const c = { x: lens.x + px * offPx * side, y: lens.y + py * offPx * side };
+      const raw = { x: lens.x + px * offPx * side, y: lens.y + py * offPx * side };
+      const c = { x: mid.x + (raw.x - mid.x) * bendAmt, y: mid.y + (raw.y - mid.y) * bendAmt };
       rays.push({ p0: src, c, p1: obs });
       ctx.strokeStyle = COL.ray;
       ctx.lineWidth = 1.4;
@@ -184,29 +227,111 @@ class SystemView {
     ctx.lineTo(lens.x, lens.y);
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.fillStyle = COL.textBright;
+    ctx.font = '11px sans-serif';
+    ctx.fillText(`u = ${evalRes.u.toFixed(2)}`, (src.x + lens.x) / 2 + 6, (src.y + lens.y) / 2 - 6);
 
     ctx.strokeStyle = COL.lens;
-    ctx.lineWidth = 1.6;
-    const lx = lens.x, ly = lens.y, m = 5;
+    ctx.lineWidth = 1.8;
+    const lx = lens.x, ly = lens.y, m = 6.5;
     ctx.beginPath();
     ctx.moveTo(lx - m, ly - m); ctx.lineTo(lx + m, ly + m);
     ctx.moveTo(lx - m, ly + m); ctx.lineTo(lx + m, ly - m);
     ctx.stroke();
+    ctx.fillStyle = COL.textBright;
+    ctx.font = '11px sans-serif';
+    ctx.fillText('透镜', lx + 10, ly - 8);
     ctx.fillStyle = COL.text;
-    ctx.fillText(p.q > 0 ? '透镜 = 恒星 + 行星（不可见）' : '透镜恒星（不可见）', 12, h - 30);
+    ctx.font = '12px sans-serif';
+    ctx.fillText(p.q > 0 ? '透镜 = 恒星 + 行星（不可见，沿轨迹运动）' : '透镜恒星（不可见，沿轨迹运动）', 12, h - 30);
 
     for (const im of evalRes.images) {
       const r = 2.2 + Math.min(6.5, Math.log2(1 + im.mu) * 1.7);
-      glowDot(ctx, X(im.z.re), Y(im.z.im), r, COL.image);
+      glowDot(ctx, TX(im.z.re), TY(im.z.im), r, COL.image);
     }
     ctx.fillStyle = COL.image;
-    ctx.fillText(`像 ×${evalRes.images.length}`, 12, 38);
+    ctx.fillText(`像 ×${evalRes.images.length}`, 12, 52);
 
-    glowDot(ctx, src.x, src.y, 5.5, COL.source);
-    ctx.strokeStyle = 'rgba(251,191,36,0.35)';
-    ctx.beginPath(); ctx.arc(src.x, src.y, 11, 0, Math.PI * 2); ctx.stroke();
+    glowDot(ctx, src.x, src.y, 6.5, COL.source);
+    ctx.strokeStyle = 'rgba(251,191,36,0.5)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(src.x, src.y, 13, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = COL.source;
-    ctx.fillText('源星', src.x + 10, src.y - 8);
+    ctx.font = '12px sans-serif';
+    ctx.fillText('源星（固定于光轴中心）', src.x + 16, src.y - 12);
+  }
+}
+
+class FindingChart {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.rng = mulberry32(20030827);
+    this.stars = [];
+    for (let i = 0; i < 220; i++) {
+      this.stars.push({
+        x: this.rng(), y: this.rng(),
+        r: 0.3 + Math.pow(this.rng(), 3) * 2.2,
+        a: 0.15 + this.rng() * 0.55,
+      });
+    }
+  }
+
+  draw(uMin) {
+    const { ctx, w, h } = setupCanvas(this.canvas);
+    ctx.fillStyle = '#070b14';
+    ctx.fillRect(0, 0, w, h);
+
+    for (const st of this.stars) {
+      ctx.globalAlpha = st.a;
+      ctx.fillStyle = '#dbeafe';
+      ctx.beginPath();
+      ctx.arc(st.x * w, st.y * h, st.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    const cx = w / 2, cy = h / 2;
+    const ringR = 32;
+
+    ctx.strokeStyle = 'rgba(74,222,128,0.95)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = COL.source;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(251,191,36,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 9, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(74,222,128,0.85)';
+    ctx.font = '10px sans-serif';
+    ctx.fillText('源星', cx + ringR + 4, cy - 4);
+
+    ctx.strokeStyle = 'rgba(125,211,252,0.45)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(8, cy); ctx.lineTo(w - 8, cy);
+    ctx.moveTo(cx, 8); ctx.lineTo(cx, h - 8);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = COL.text;
+    ctx.font = '10px sans-serif';
+    ctx.fillText('N', cx + 4, 12);
+    ctx.fillText('S', cx + 4, h - 4);
+    ctx.fillText('E', w - 14, cy + 4);
+    ctx.fillText('W', 4, cy + 4);
+
+    ctx.fillStyle = COL.textBright;
+    ctx.font = '10.5px sans-serif';
+    ctx.fillText('Finding Chart · 5″×5″ 视场', 8, h - 8);
   }
 }
 
@@ -237,7 +362,10 @@ class CurveView {
   draw(state) {
     const { ctx, w, h } = setupCanvas(this.canvas);
     const m = this.m;
-    const X = (t) => m.l + (t / window.MLPHYS.SEASON_DAYS) * (w - m.l - m.r);
+    const SEASON = window.MLPHYS.SEASON_DAYS;
+    const EPOCH = window.MLPHYS.EPOCH_HJD_OFFSET;
+    const X = (t) => m.l + (t / SEASON) * (w - m.l - m.r);
+    const XLabel = (t) => Math.round(t + EPOCH);
     const Y = (F) => h - m.b - (F / this.yMax) * (h - m.t - m.b);
 
     ctx.strokeStyle = COL.grid;
@@ -245,7 +373,7 @@ class CurveView {
     for (let F = 0; F <= this.yMax; F += this.yMax > 20 ? 10 : this.yMax > 6 ? 2 : 1) {
       ctx.beginPath(); ctx.moveTo(m.l, Y(F)); ctx.lineTo(w - m.r, Y(F)); ctx.stroke();
     }
-    for (let d = 0; d <= 180; d += 30) {
+    for (let d = 0; d <= SEASON; d += 30) {
       ctx.beginPath(); ctx.moveTo(X(d), m.t); ctx.lineTo(X(d), h - m.b); ctx.stroke();
     }
 
@@ -264,18 +392,48 @@ class CurveView {
 
     ctx.fillStyle = COL.text;
     ctx.font = '11px sans-serif';
-    ctx.fillText('t (天)', w - 40, h - 12);
+    ctx.fillText(`HJD − ${EPOCH}（天）`, w - 110, h - 12);
     ctx.save();
     ctx.translate(13, m.t + 44);
     ctx.rotate(-Math.PI / 2);
     ctx.fillText('相对流量 F', 0, 0);
     ctx.restore();
 
+    if (this.meta && this.meta.tEnd - this.meta.tStart > 4) {
+      const sx = X(this.meta.tStart), ex = X(this.meta.tEnd);
+      ctx.fillStyle = COL.silhouette;
+      ctx.beginPath();
+      ctx.moveTo(sx, Y(1));
+      for (const c of this.model) {
+        if (c.t < this.meta.tStart) continue;
+        if (c.t > this.meta.tEnd) break;
+        ctx.lineTo(X(c.t), Y(c.F));
+      }
+      ctx.lineTo(ex, Y(1));
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.setLineDash([3, 4]);
+      ctx.strokeStyle = 'rgba(251,191,36,0.55)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(sx, m.t); ctx.lineTo(sx, h - m.b); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ex, m.t); ctx.lineTo(ex, h - m.b); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(251,191,36,0.85)';
+      ctx.font = '10.5px sans-serif';
+      const startLabel = `事件开始 ★ HJD-${XLabel(this.meta.tStart)}`;
+      const endLabel = `事件结束 HJD-${XLabel(this.meta.tEnd)}`;
+      const sLabelX = Math.min(sx + 4, w - 140);
+      const eLabelX = ex - ctx.measureText(endLabel).width - 4;
+      ctx.fillText(startLabel, sLabelX, m.t + 10);
+      ctx.fillText(endLabel, eLabelX, m.t + 10);
+    }
+
     ctx.setLineDash([4, 4]);
     ctx.strokeStyle = '#64748b';
     ctx.beginPath(); ctx.moveTo(X(this.p.t0), m.t); ctx.lineTo(X(this.p.t0), h - m.b); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillText('t₀', X(this.p.t0) + 4, m.t + 12);
+    ctx.fillText('t₀', X(this.p.t0) + 4, m.t + 22);
 
     if (this.truthModel) {
       ctx.strokeStyle = COL.truth;
@@ -292,7 +450,7 @@ class CurveView {
     }
 
     ctx.strokeStyle = COL.model;
-    ctx.lineWidth = 1.6;
+    ctx.lineWidth = 2.2;
     ctx.beginPath();
     for (let i = 0; i < this.model.length; i++) {
       const c = this.model[i];
@@ -302,21 +460,28 @@ class CurveView {
     ctx.stroke();
 
     for (const d of this.data) {
-      if (d.t > state.t) continue;
-      const age = state.t - d.t;
-      const alpha = Math.min(1, age / 1.5);
+      const isFuture = d.t > state.t;
       const x = X(d.t), y = Y(d.Fo);
-      ctx.globalAlpha = alpha;
-      ctx.strokeStyle = 'rgba(226,232,240,0.5)';
+      ctx.strokeStyle = isFuture ? COL.dataFuture : 'rgba(226,232,240,0.5)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(x, Y(d.Fo - d.sig));
       ctx.lineTo(x, Y(d.Fo + d.sig));
       ctx.stroke();
-      const pop = age < 0.5 ? 1.8 - age : 1;
-      ctx.fillStyle = COL.data;
-      ctx.beginPath(); ctx.arc(x, y, 1.8 * pop, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 1;
+      if (isFuture) {
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = COL.data;
+        ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+      } else {
+        const age = state.t - d.t;
+        const alpha = Math.min(1, age / 1.5);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = COL.data;
+        const pop = age < 0.5 ? 1.8 - age : 1;
+        ctx.beginPath(); ctx.arc(x, y, 1.8 * pop, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
     }
 
     ctx.strokeStyle = COL.now;
@@ -324,14 +489,34 @@ class CurveView {
     ctx.beginPath(); ctx.moveTo(X(state.t), m.t); ctx.lineTo(X(state.t), h - m.b); ctx.stroke();
     const e = window.MLPHYS.evalLens(this.p, state.t);
     const Fnow = window.MLPHYS.modelFlux(this.p, e.A);
+    ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(X(state.t), Y(Fnow), 4, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = COL.now;
-    ctx.beginPath(); ctx.arc(X(state.t), Y(Fnow), 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(X(state.t), m.t); ctx.lineTo(X(state.t) - 4, m.t + 6); ctx.lineTo(X(state.t) + 4, m.t + 6);
+    ctx.closePath(); ctx.fill();
     ctx.font = '12px sans-serif';
-    ctx.fillText(`第 ${state.t.toFixed(0)} 天  A=${e.A.toFixed(2)}  F=${Fnow.toFixed(2)}`, Math.min(X(state.t) + 8, w - 160), m.t + 14);
+    ctx.fillText(`HJD−${EPOCH}+${state.t.toFixed(0)}  A=${e.A.toFixed(2)}  F=${Fnow.toFixed(2)}`, Math.min(X(state.t) + 8, w - 200), m.t + 14);
+    ctx.font = '10px sans-serif';
+    ctx.fillText('当前时刻', Math.min(X(state.t) + 6, w - 46), Y(Fnow) - 8);
 
-    if (this.meta) {
-      ctx.fillStyle = COL.textBright;
-      ctx.fillText(`A_max=${this.meta.Amax.toFixed(1)} @ t₀=${this.p.t0.toFixed(0)}d   t_FWHM≈${this.meta.tFwhm.toFixed(1)}d   t_E=${this.p.tE}d`, m.l + 6, h - 12);
+    if (this.meta && this.meta.tEnd - this.meta.tStart > 4) {
+      const sx = X(this.meta.tStart);
+      const sy = Y(Math.max(window.MLPHYS.modelFlux(this.p, this.meta.Amax), 2.6));
+      ctx.fillStyle = COL.alert;
+      ctx.beginPath();
+      const pts = [
+        { x: sx - 5, y: sy - 10 }, { x: sx - 3, y: sy - 4 }, { x: sx + 5, y: sy - 2 },
+        { x: sx - 1, y: sy + 2 }, { x: sx + 3, y: sy + 10 }, { x: sx, y: sy + 4 },
+        { x: sx - 5, y: sy + 2 }, { x: sx - 7, y: sy - 4 },
+      ];
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.font = '10.5px sans-serif';
+      ctx.fillStyle = COL.alert;
+      ctx.fillText('★ 警报触发', sx + 8, sy + 4);
     }
 
     if (this.showLegend) {
@@ -342,10 +527,13 @@ class CurveView {
       ctx.fillStyle = COL.truth;
       ctx.fillText('- - 真值', lx, m.t + 27);
       ctx.fillStyle = COL.data;
-      ctx.fillText('· 观测数据', lx, m.t + 42);
+      ctx.fillText('· 已观测', lx, m.t + 42);
+      ctx.fillStyle = COL.dataFuture;
+      ctx.fillText('· 未观测', lx, m.t + 57);
     }
   }
 }
 
 window.SystemView = SystemView;
 window.CurveView = CurveView;
+window.FindingChart = FindingChart;

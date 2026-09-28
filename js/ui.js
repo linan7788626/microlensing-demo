@@ -12,11 +12,11 @@ const UI = {
     this.onControl = handlers.onControl;
     const ids = ['slider-t0', 'slider-umin', 'slider-te', 'slider-fs', 'slider-q', 'slider-s',
       'val-t0', 'val-umin', 'val-te', 'val-fs', 'val-q', 'val-s',
-      'btn-play', 'btn-reset', 'btn-rewind', 'btn-gallery', 'btn-gallery-close',
+      'btn-play', 'btn-reset', 'btn-rewind', 'btn-full', 'btn-gallery', 'btn-gallery-close',
       'speed-group', 'readout-u', 'readout-a', 'readout-nimg', 'readout-params',
       'regime-text', 'event-log', 'toast-area', 'modal-gallery', 'gallery-list',
       'gallery-count', 'row-s', 'btn-puzzle', 'puzzle-bar', 'btn-reveal', 'btn-next',
-      'chi2-readout', 'verdict-box'];
+      'chi2-readout', 'verdict-box', 'event-meta', 'ring-arcsec'];
     for (const id of ids) this.els[id] = document.getElementById(id);
 
     for (const s of ['t0', 'umin', 'te', 'fs', 'q', 's']) {
@@ -27,6 +27,7 @@ const UI = {
 
     this.els['btn-play'].onclick = () => this.onControl('play');
     this.els['btn-rewind'].onclick = () => this.onControl('rewind');
+    this.els['btn-full'].onclick = () => this.onControl('full');
     this.els['btn-reset'].onclick = () => this.onControl('reseed');
     this.els['btn-puzzle'].onclick = () => this.onControl('puzzle');
     this.els['btn-reveal'].onclick = () => this.onControl('reveal');
@@ -109,6 +110,27 @@ const UI = {
     this.els['readout-params'].innerHTML =
       `A_max ≈ ${meta.Amax.toFixed(1)}（≈ 1/u_min = ${(1 / Math.max(ev.p.uMin, 1e-6)).toFixed(1)}）<br>` +
       `t_FWHM ≈ ${meta.tFwhm.toFixed(1)} 天　|　t₀ = ${ev.p.t0.toFixed(0)} 天　|　t_E = ${ev.p.tE} 天`;
+
+    if (this.els['event-meta'] && meta) {
+      const dur = meta.tEnd - meta.tStart;
+      const EPOCH = window.MLPHYS.EPOCH_HJD_OFFSET;
+      const items = [
+        { label: '持续', value: `≈ ${dur.toFixed(1)} 天` },
+        { label: '峰值', value: `F=${meta.Fmax.toFixed(2)} @ HJD-${EPOCH + Math.round(meta.tPeak)}` },
+        { label: '放大', value: `≈ ${meta.Amax.toFixed(1)}×` },
+        { label: 'FWHM', value: `≈ ${meta.tFwhm.toFixed(1)} 天` },
+        { label: '开始', value: `HJD-${EPOCH + Math.round(meta.tStart)}` },
+        { label: '结束', value: `HJD-${EPOCH + Math.round(meta.tEnd)}` },
+      ];
+      this.els['event-meta'].innerHTML =
+        items.map((it) => `<div class="em-cell"><span>${it.label}</span><b>${it.value}</b></div>`).join('');
+    }
+
+    if (this.els['ring-arcsec']) {
+      const thetaE = Math.sqrt(ev.p.uMin) * 1;
+      const arc = (thetaE * 3600 * (180 / Math.PI) * 0.5).toFixed(2);
+      this.els['ring-arcsec'].textContent = `≈ ${arc}″（示意）`;
+    }
   },
 
   updateRegime(ev) {

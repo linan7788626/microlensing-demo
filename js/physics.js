@@ -211,6 +211,8 @@ function modelFlux(p, A) {
 }
 
 const SEASON_DAYS = 180;
+const EPOCH_HJD_OFFSET = 2452848;
+const EVENT_THRESHOLD = 1.2;
 
 function modelCurve(p, n = 360) {
   const pts = [];
@@ -271,13 +273,23 @@ function curveAnalytics(p) {
   }
   const half = (Amax + 1) / 2;
   let t1 = null, t2 = null;
+  let tStart = null, tEnd = null;
   for (let k = 1; k < curve.length; k++) {
     const a = curve[k - 1], b = curve[k];
     if (t1 === null && a.A < half && b.A >= half) t1 = a.t + (half - a.A) / (b.A - a.A) * (b.t - a.t);
     if (t1 !== null && a.A >= half && b.A < half) { t2 = a.t + (a.A - half) / (a.A - b.A) * (b.t - a.t); break; }
   }
+  for (let k = 1; k < curve.length; k++) {
+    const a = curve[k - 1], b = curve[k];
+    if (tStart === null && a.A < EVENT_THRESHOLD && b.A >= EVENT_THRESHOLD) tStart = a.t + (EVENT_THRESHOLD - a.A) / (b.A - a.A) * (b.t - a.t);
+    if (tStart !== null && a.A >= EVENT_THRESHOLD && b.A < EVENT_THRESHOLD) { tEnd = a.t + (a.A - EVENT_THRESHOLD) / (a.A - b.A) * (b.t - a.t); break; }
+  }
+  if (tStart === null) tStart = 0;
+  if (tEnd === null) tEnd = SEASON_DAYS;
   const tFwhm = t1 !== null && t2 !== null ? t2 - t1 : SEASON_DAYS;
-  return { Amax, tPeak, tFwhm };
+  const tDuration = tEnd - tStart;
+  const Fmax = modelFlux(p, Amax);
+  return { Amax, tPeak, tFwhm, tStart, tEnd, tDuration, Fmax };
 }
 
 function lensJ(z, m1, m2, z1, z2) {
@@ -304,7 +316,7 @@ const MS_TABLE = {
 };
 
 function causticSegments(p, res = 240) {
-  if (!p.q || p.q <= 0) return { segs: [], half: 2 };
+  if (!p.q || p.q <= 0) return { segs: [], critSegs: [], half: 2 };
   const { m1, m2, z1, z2 } = lensSystemParams(p);
   const half = Math.max(1.6, p.s + 1.2);
   const vals = new Float64Array(res * res);
@@ -316,6 +328,7 @@ function causticSegments(p, res = 240) {
     }
   }
   const segs = [];
+  const critSegs = [];
   for (let j = 0; j < res - 1; j++) {
     for (let i = 0; i < res - 1; i++) {
       const va = vals[i + j * res], vb = vals[i + 1 + j * res];
@@ -336,19 +349,21 @@ function causticSegments(p, res = 240) {
         };
       };
       for (const e of pairs) {
-        const p1 = lensMap(pt(e), m1, m2, z1, z2);
-        const p2 = lensMap(pt([e[1], e[0]]), m1, m2, z1, z2);
+        const q1 = pt(e), q2 = pt([e[1], e[0]]);
+        critSegs.push({ x1: q1.re, y1: q1.im, x2: q2.re, y2: q2.im });
+        const p1 = lensMap(q1, m1, m2, z1, z2);
+        const p2 = lensMap(q2, m1, m2, z1, z2);
         segs.push({ x1: p1.re, y1: p1.im, x2: p2.re, y2: p2.im });
       }
     }
   }
-  return { segs, half };
+  return { segs, critSegs, half };
 }
 
 window.MLPHYS = {
   Z0, cadd, csub, cmul, cdiv, cconj, cabs, cabs2, cinv, cscale, polyEval, solvePoly,
   paczynskiA, singleLensImages, lensSystemParams, binaryCoeffs, binaryImages, lensEqNewton,
-  evalLens, modelFlux, SEASON_DAYS, modelCurve, mulberry32, gauss,
+  evalLens, modelFlux, SEASON_DAYS, EPOCH_HJD_OFFSET, EVENT_THRESHOLD, modelCurve, mulberry32, gauss,
   OBS_CADENCE, OBS_GAP_P, OBS_SIGMA, obsSlots, buildObs, curveAnalytics,
   lensJ, lensMap, causticSegments,
 };

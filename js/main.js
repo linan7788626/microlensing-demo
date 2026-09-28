@@ -1,7 +1,7 @@
 'use strict';
 
 const App = {
-  params: { t0: 90, uMin: 0.05, tE: 30, fs: 1, q: 0.003, s: 1.2 },
+  params: { t0: 80, uMin: 0.15, tE: 25, fs: 1, q: 0, s: 1.2 },
   sandboxParams: null,
   mode: 'sandbox',
   puzzle: null,
@@ -27,6 +27,7 @@ const App = {
     });
     this.sysView = new SystemView(document.getElementById('system-canvas'));
     this.curveView = new CurveView(document.getElementById('curve-canvas'));
+    this.findingView = new FindingChart(document.getElementById('finding-canvas'));
     try {
       const saved = JSON.parse(localStorage.getItem('microlensing-demo-save') || '[]');
       saved.forEach((id) => this.unlocked.add(id));
@@ -85,6 +86,12 @@ const App = {
         UI.log('天气重新抽签：部分夜晚的观测点已重新生成', 'sys');
       }
       this.rebuild();
+    } else if (cmd === 'full') {
+      this.t = window.MLPHYS.SEASON_DAYS;
+      this.prevT = this.t;
+      this.playing = false;
+      UI.setPlayButton(this.playing);
+      UI.log('📷 切到完整事件视图——蓝色光标已到达末端，可看到事件从开始到结束的全部光变。', 'sys');
     } else if (cmd === 'speed') {
       this.speed = v;
       UI.setSpeedUI(v);
@@ -175,6 +182,7 @@ const App = {
 
     this.sysView.setParams(displayP);
     this.sysView.draw(displayP, ev, ts);
+    this.findingView.draw(displayP.uMin);
     this.curveView.draw({ t: this.t });
 
     if (ts - this.lastReadout > 150) {
