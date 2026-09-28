@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VER = 'v8';
+const APP_VER = 'v11';
 
 const COL = {
   grid: '#1c2740',
@@ -25,16 +25,19 @@ const COL = {
 
 function setupCanvas(canvas) {
   const dpr = window.devicePixelRatio || 1;
-  const w = canvas.width, h = canvas.height;
+  if (canvas._lw === undefined) {
+    canvas._lw = canvas.width;
+    canvas._lh = canvas.height;
+  }
   if (canvas._dpr !== dpr) {
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
     canvas._dpr = dpr;
+    canvas.width = Math.round(canvas._lw * dpr);
+    canvas.height = Math.round(canvas._lh * dpr);
   }
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-  return { ctx, w, h };
+  ctx.clearRect(0, 0, canvas._lw, canvas._lh);
+  return { ctx, w: canvas._lw, h: canvas._lh };
 }
 
 function glowDot(ctx, x, y, r, color, glowScale = 3) {
