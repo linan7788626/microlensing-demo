@@ -35,9 +35,12 @@ const App = {
     UI.setGalleryCount(this.unlocked.size, window.KNOWLEDGE_CARDS.length);
     UI.setSpeedUI(this.speed);
     UI.setPlayButton(this.playing);
+    const badge = document.getElementById('app-ver');
+    if (badge) badge.textContent = window.APP_VER;
     this.slots = window.MLPHYS.obsSlots(42);
     this.sandboxParams = { ...this.params };
     this.rebuild();
+    UI.log(`🔍 诊断: ${window.APP_VER} · 画布 ${this.sysView.canvas.width}×${this.sysView.canvas.height} · t₀=${this.params.t0}天 u_min=${this.params.uMin} t_E=${this.params.tE}天 q=${this.params.q}`, 'sys');
     this.lastFrame = performance.now();
     requestAnimationFrame((ts) => this.loop(ts));
   },

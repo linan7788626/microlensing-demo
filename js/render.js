@@ -1,5 +1,7 @@
 'use strict';
 
+const APP_VER = 'v8';
+
 const COL = {
   grid: '#1c2740',
   ring: '#8b9bb4',
@@ -63,6 +65,8 @@ class SystemView {
     this.canvas = canvas;
     this.causticCache = null;
     this.causticKey = '';
+    this.trail = [];
+    this.lastTau = null;
     const rng = mulberry32(20260927);
     this.stars = [];
     for (let i = 0; i < 110; i++) {
@@ -119,6 +123,8 @@ class SystemView {
     ctx.fillStyle = 'rgba(251,191,36,0.4)';
     ctx.font = '10px sans-serif';
     ctx.fillText('光轴（视线）', cx + 4, 14);
+    ctx.fillStyle = '#475569';
+    ctx.fillText(APP_VER, w - 34, 16);
 
     const zeta = evalRes.zeta;
     const TX = (x) => X(zeta.re - x);
@@ -127,6 +133,14 @@ class SystemView {
     const src = { x: X(0), y: Y(0) };
     const lens = { x: TX(0), y: TY(0) };
     const obs = { x: cx, y: h - 16 };
+
+    if (this.lastTau !== null && evalRes.tau < this.lastTau - 0.5) this.trail.length = 0;
+    this.lastTau = evalRes.tau;
+    const lastPt = this.trail[this.trail.length - 1];
+    if (!lastPt || Math.hypot(lens.x - lastPt.x, lens.y - lastPt.y) > 1.5) {
+      this.trail.push({ x: lens.x, y: lens.y });
+      if (this.trail.length > 16) this.trail.shift();
+    }
 
     ctx.setLineDash([5, 5]);
     ctx.strokeStyle = COL.ring;
@@ -181,6 +195,16 @@ class SystemView {
     ctx.fillStyle = COL.text;
     ctx.fillText(`透镜轨迹（u_min = ${p.uMin.toFixed(2)} R_E）`, 12, trajY - 8);
 
+    ctx.strokeStyle = 'rgba(251,191,36,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(X(0), trajY - 7);
+    ctx.lineTo(X(0), trajY + 7);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(251,191,36,0.8)';
+    ctx.font = '10.5px sans-serif';
+    ctx.fillText('t₀ 峰值（透镜最近）', X(0) + 6, trajY + 17);
+
     const bendAmt = Math.max(0, Math.min(1, (2.2 - evalRes.u) / 1.2));
     const offPx = Math.min(1.05, 0.3 + 0.55 / Math.max(evalRes.u, 0.3)) * k;
     const dx = obs.x - src.x, dy = obs.y - src.y;
@@ -231,6 +255,16 @@ class SystemView {
     ctx.font = '11px sans-serif';
     ctx.fillText(`u = ${evalRes.u.toFixed(2)}`, (src.x + lens.x) / 2 + 6, (src.y + lens.y) / 2 - 6);
 
+    for (let i = 0; i < this.trail.length; i++) {
+      const pt = this.trail[i];
+      ctx.globalAlpha = ((i + 1) / this.trail.length) * 0.35;
+      ctx.fillStyle = '#cbd5e1';
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
     ctx.strokeStyle = COL.lens;
     ctx.lineWidth = 1.8;
     const lx = lens.x, ly = lens.y, m = 6.5;
@@ -241,6 +275,8 @@ class SystemView {
     ctx.fillStyle = COL.textBright;
     ctx.font = '11px sans-serif';
     ctx.fillText('透镜', lx + 10, ly - 8);
+    ctx.font = '10.5px sans-serif';
+    ctx.fillText(`第 ${Math.round(p.t0 + evalRes.tau * p.tE)} 天`, Math.min(lx - 14, w - 48), ly + 20);
     ctx.fillStyle = COL.text;
     ctx.font = '12px sans-serif';
     ctx.fillText(p.q > 0 ? '透镜 = 恒星 + 行星（不可见，沿轨迹运动）' : '透镜恒星（不可见，沿轨迹运动）', 12, h - 30);
@@ -484,17 +520,19 @@ class CurveView {
       }
     }
 
-    ctx.strokeStyle = COL.now;
+    ctx.strokeStyle = 'rgba(148,163,184,0.75)';
     ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.moveTo(X(state.t), m.t); ctx.lineTo(X(state.t), h - m.b); ctx.stroke();
     const e = window.MLPHYS.evalLens(this.p, state.t);
     const Fnow = window.MLPHYS.modelFlux(this.p, e.A);
+    ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1.6;
     ctx.beginPath(); ctx.arc(X(state.t), Y(Fnow), 4, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = COL.now;
+    ctx.fillStyle = '#e2e8f0';
     ctx.beginPath();
     ctx.moveTo(X(state.t), m.t); ctx.lineTo(X(state.t) - 4, m.t + 6); ctx.lineTo(X(state.t) + 4, m.t + 6);
     ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#cbd5e1';
     ctx.font = '12px sans-serif';
     ctx.fillText(`HJD−${EPOCH}+${state.t.toFixed(0)}  A=${e.A.toFixed(2)}  F=${Fnow.toFixed(2)}`, Math.min(X(state.t) + 8, w - 200), m.t + 14);
     ctx.font = '10px sans-serif';
@@ -537,3 +575,4 @@ class CurveView {
 window.SystemView = SystemView;
 window.CurveView = CurveView;
 window.FindingChart = FindingChart;
+window.APP_VER = APP_VER;
