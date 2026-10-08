@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VER = 'v11';
+const APP_VER = 'v22';
 
 const COL = {
   grid: '#1c2740',
@@ -93,11 +93,10 @@ class SystemView {
 
   draw(p, evalRes, ts = 0) {
     const { ctx, w, h } = setupCanvas(this.canvas);
-    const half = this.half;
-    const cx = w / 2, cy = h / 2;
-    const k = Math.min(w, h) / (2 * half);
-    const X = (x) => cx + x * k;
-    const Y = (y) => cy - y * k;
+    const cx = w / 2;
+    const srcY = 95, lensY = 330, obsY = 588;
+    const src = { x: cx, y: srcY };
+    const obs = { x: cx, y: obsY };
 
     ctx.fillStyle = '#070b14';
     ctx.fillRect(0, 0, w, h);
@@ -110,194 +109,185 @@ class SystemView {
     }
     ctx.globalAlpha = 1;
 
-    ctx.strokeStyle = 'rgba(30,41,64,0.6)';
-    ctx.lineWidth = 1;
-    const gStep = half > 4.5 ? 2 : 1;
-    const gMax = Math.floor(half / gStep) * gStep;
-    for (let g = -gMax; g <= gMax; g += gStep) {
-      ctx.beginPath(); ctx.moveTo(X(g), 0); ctx.lineTo(X(g), h); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, Y(g)); ctx.lineTo(w, Y(g)); ctx.stroke();
-    }
-
-    ctx.strokeStyle = 'rgba(251,191,36,0.16)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, h); ctx.stroke();
-    ctx.fillStyle = 'rgba(251,191,36,0.4)';
-    ctx.font = '10px sans-serif';
-    ctx.fillText('光轴（视线）', cx + 4, 14);
     ctx.fillStyle = '#475569';
+    ctx.font = '10px sans-serif';
     ctx.fillText(APP_VER, w - 34, 16);
 
-    const zeta = evalRes.zeta;
-    const TX = (x) => X(zeta.re - x);
-    const TY = (y) => Y(y - zeta.im);
+    // 视线（光轴）：源 → 观测者，虚线即无透镜时的直线路径
+    ctx.setLineDash([6, 5]);
+    ctx.strokeStyle = 'rgba(251,191,36,0.28)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx, srcY + 24); ctx.lineTo(cx, obsY - 30); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(251,191,36,0.75)';
+    ctx.font = '10.5px sans-serif';
+    ctx.fillText('视线（光轴）＝无透镜时的直线路径', cx + 6, srcY + 40);
 
-    const src = { x: X(0), y: Y(0) };
-    const lens = { x: TX(0), y: TY(0) };
-    const obs = { x: cx, y: h - 16 };
+    // 透镜平面
+    ctx.setLineDash([7, 6]);
+    ctx.strokeStyle = 'rgba(71,85,105,0.85)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(10, lensY); ctx.lineTo(w - 10, lensY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = COL.text;
+    ctx.font = '11px sans-serif';
+    ctx.fillText('透镜平面', 12, lensY - 8);
 
-    if (this.lastTau !== null && evalRes.tau < this.lastTau - 0.5) this.trail.length = 0;
-    this.lastTau = evalRes.tau;
+    const tau = evalRes.tau;
+    const maxSpan = Math.max(p.t0 / p.tE, (window.MLPHYS.SEASON_DAYS - p.t0) / p.tE) + 0.5;
+    const kSide = Math.min(55, (w / 2 - 36) / maxSpan);
+    const lensX = cx + tau * kSide;
+
+    // 运动拖尾
+    if (this.lastTau !== null && tau < this.lastTau - 0.5) this.trail.length = 0;
+    this.lastTau = tau;
     const lastPt = this.trail[this.trail.length - 1];
-    if (!lastPt || Math.hypot(lens.x - lastPt.x, lens.y - lastPt.y) > 1.5) {
-      this.trail.push({ x: lens.x, y: lens.y });
+    if (!lastPt || Math.hypot(lensX - lastPt.x, lensY - lastPt.y) > 1.5) {
+      this.trail.push({ x: lensX, y: lensY });
       if (this.trail.length > 16) this.trail.shift();
     }
-
-    ctx.setLineDash([5, 5]);
-    ctx.strokeStyle = COL.ring;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(lens.x, lens.y, k, 0, Math.PI * 2); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = COL.text;
-    ctx.font = '12px sans-serif';
-    ctx.fillText('爱因斯坦环 R_E', Math.max(6, Math.min(lens.x + k * 0.55, w - 122)), lens.y - k * 0.78);
-
-    if (p.q > 0 && this.causticCache && this.causticCache.segs.length) {
-      ctx.strokeStyle = COL.caustic;
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      for (const s of this.causticCache.segs) {
-        ctx.moveTo(TX(s.x1), TY(s.y1));
-        ctx.lineTo(TX(s.x2), TY(s.y2));
-      }
-      ctx.stroke();
-      ctx.fillStyle = COL.caustic;
-      ctx.fillText('焦散线（源平面）', 12, 20);
-    }
-
-    if (p.q > 0 && this.causticCache && this.causticCache.critSegs.length) {
-      ctx.strokeStyle = COL.crit;
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      for (const s of this.causticCache.critSegs) {
-        ctx.moveTo(TX(s.x1), TY(s.y1));
-        ctx.lineTo(TX(s.x2), TY(s.y2));
-      }
-      ctx.stroke();
-      ctx.fillStyle = COL.crit;
-      ctx.fillText('临界曲线（像平面 J=0）', 12, 36);
-    }
-
-    const trajY = TY(0);
-    ctx.strokeStyle = 'rgba(71,85,105,0.8)';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(0, trajY);
-    ctx.lineTo(w, trajY);
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(100,116,139,0.9)';
-    const ax = w - 34;
-    ctx.beginPath();
-    ctx.moveTo(ax, trajY - 4);
-    ctx.lineTo(ax, trajY + 4);
-    ctx.lineTo(ax + 9, trajY);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = COL.text;
-    ctx.fillText(`透镜轨迹（u_min = ${p.uMin.toFixed(2)} R_E）`, 12, trajY - 8);
-
-    ctx.strokeStyle = 'rgba(251,191,36,0.55)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(X(0), trajY - 7);
-    ctx.lineTo(X(0), trajY + 7);
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(251,191,36,0.8)';
-    ctx.font = '10.5px sans-serif';
-    ctx.fillText('t₀ 峰值（透镜最近）', X(0) + 6, trajY + 17);
-
-    const bendAmt = Math.max(0, Math.min(1, (2.2 - evalRes.u) / 1.2));
-    const offPx = Math.min(1.05, 0.3 + 0.55 / Math.max(evalRes.u, 0.3)) * k;
-    const dx = obs.x - src.x, dy = obs.y - src.y;
-    const dl = Math.hypot(dx, dy) || 1;
-    const px = -dy / dl, py = dx / dl;
-    const mid = { x: (src.x + obs.x) / 2, y: (src.y + obs.y) / 2 };
-    const rays = [];
-    for (const side of [1, -1]) {
-      const raw = { x: lens.x + px * offPx * side, y: lens.y + py * offPx * side };
-      const c = { x: mid.x + (raw.x - mid.x) * bendAmt, y: mid.y + (raw.y - mid.y) * bendAmt };
-      rays.push({ p0: src, c, p1: obs });
-      ctx.strokeStyle = COL.ray;
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.moveTo(src.x, src.y);
-      ctx.quadraticCurveTo(c.x, c.y, obs.x, obs.y);
-      ctx.stroke();
-    }
-    for (let i = 0; i < rays.length; i++) {
-      const r = rays[i];
-      for (let j = 0; j < 2; j++) {
-        const t = ((ts / 900) + i * 0.5 + j * 0.25) % 1;
-        const pos = qbez(r.p0, r.c, r.p1, t);
-        const fade = Math.sin(t * Math.PI);
-        ctx.globalAlpha = 0.35 + 0.6 * fade;
-        ctx.fillStyle = '#bae6fd';
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, 2.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-    }
-
-    ctx.font = '16px sans-serif';
-    ctx.fillText('🔭', obs.x - 9, obs.y + 6);
-    ctx.font = '12px sans-serif';
-    ctx.fillStyle = COL.text;
-    ctx.fillText('观测者', obs.x + 14, obs.y + 2);
-
-    ctx.setLineDash([3, 3]);
-    ctx.strokeStyle = 'rgba(148,163,184,0.5)';
-    ctx.beginPath();
-    ctx.moveTo(src.x, src.y);
-    ctx.lineTo(lens.x, lens.y);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = COL.textBright;
-    ctx.font = '11px sans-serif';
-    ctx.fillText(`u = ${evalRes.u.toFixed(2)}`, (src.x + lens.x) / 2 + 6, (src.y + lens.y) / 2 - 6);
-
     for (let i = 0; i < this.trail.length; i++) {
       const pt = this.trail[i];
-      ctx.globalAlpha = ((i + 1) / this.trail.length) * 0.35;
+      ctx.globalAlpha = ((i + 1) / this.trail.length) * 0.3;
       ctx.fillStyle = '#cbd5e1';
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
 
+    // u 与 θ_E 标尺
+    const ruler = (x1, x2, y, color, label, below) => {
+      if (Math.abs(x2 - x1) < 4) return;
+      const a = Math.min(x1, x2), b = Math.max(x1, x2);
+      ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(a, y); ctx.lineTo(b, y); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(a, y - 4); ctx.lineTo(a, y + 4);
+      ctx.moveTo(b, y - 4); ctx.lineTo(b, y + 4);
+      ctx.stroke();
+      ctx.font = '10.5px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, (a + b) / 2, below ? y + 15 : y - 6);
+      ctx.textAlign = 'start';
+    };
+    ruler(cx, lensX, lensY - 14, 'rgba(251,191,36,0.75)', `u = ${evalRes.u.toFixed(2)} R_E`, false);
+    ruler(lensX - kSide, lensX + kSide, lensY + 18, 'rgba(139,155,180,0.9)', '爱因斯坦半径 θ_E', true);
+
+    // 透镜 ×
     ctx.strokeStyle = COL.lens;
     ctx.lineWidth = 1.8;
-    const lx = lens.x, ly = lens.y, m = 6.5;
+    const m = 6.5;
     ctx.beginPath();
-    ctx.moveTo(lx - m, ly - m); ctx.lineTo(lx + m, ly + m);
-    ctx.moveTo(lx - m, ly + m); ctx.lineTo(lx + m, ly - m);
+    ctx.moveTo(lensX - m, lensY - m); ctx.lineTo(lensX + m, lensY + m);
+    ctx.moveTo(lensX - m, lensY + m); ctx.lineTo(lensX + m, lensY - m);
     ctx.stroke();
     ctx.fillStyle = COL.textBright;
     ctx.font = '11px sans-serif';
-    ctx.fillText('透镜', lx + 10, ly - 8);
+    ctx.fillText('透镜（不可见）', lensX + 10, lensY + 3);
     ctx.font = '10.5px sans-serif';
-    ctx.fillText(`第 ${Math.round(p.t0 + evalRes.tau * p.tE)} 天`, Math.min(lx - 14, w - 48), ly + 20);
-    ctx.fillStyle = COL.text;
+    ctx.fillText(`第 ${Math.round(p.t0 + tau * p.tE)} 天`, Math.min(lensX - 14, w - 48), lensY + 48);
+
+    // 光线偏折：沿放大率最高的两个像画折线路径
+    // 折点偏移 = τ 轴分量（−z.re，远离对齐）与 u 轴分量（z.im，对齐附近）的平滑混合，
+    // 透镜方程保证折角恒指向透镜；对齐时两折点分居透镜两侧、连续无跳变
+    const imgs = [...evalRes.images].sort((a, b) => b.mu - a.mu).slice(0, 2);
+    const wBlend = Math.abs(tau) / (Math.abs(tau) + 0.06);
+    const rays = imgs.map((im, idx) => {
+      const offRe = -im.z.re * kSide * wBlend;
+      const offIm = Math.sign(im.z.im || 1) * Math.abs(im.z.im) * kSide * (1 - wBlend) * 0.4;
+      const off = Math.max(-250, Math.min(250, offRe + offIm));
+      const kx = Math.max(6, Math.min(w - 6, lensX + off));
+      return { kx, mu: im.mu };
+    });
+
+    // 线宽 ∝ 对应像的放大率 μ（亮度信息编码在粗细里）
+    const muMax = Math.max(...rays.map(r => r.mu), 1e-6);
+    rays.forEach((r, idx) => {
+      const kink = { x: r.kx, y: lensY };
+      const extT = (srcY - lensY) / (obsY - lensY);
+      const wRay = Math.max(0.55, Math.min(4.6, 3.4 * r.mu / muMax));
+      ctx.strokeStyle = COL.ray;
+      ctx.lineWidth = wRay;
+      ctx.beginPath();
+      ctx.moveTo(src.x, src.y);
+      ctx.lineTo(kink.x, kink.y);
+      ctx.lineTo(obs.x, obs.y);
+      ctx.stroke();
+      // 到达光线的反向延长线 → 像的视位置
+      const appX = kink.x + extT * (cx - kink.x);
+      ctx.setLineDash([3, 4]);
+      ctx.strokeStyle = 'rgba(125,211,252,0.45)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(kink.x, kink.y);
+      ctx.lineTo(appX, srcY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (appX > 10 && appX < w - 10) {
+        ctx.fillStyle = idx === 0 ? '#7dd3fc' : 'rgba(125,211,252,0.65)';
+        ctx.beginPath(); ctx.arc(appX, srcY, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.font = '10.5px sans-serif';
+        ctx.fillText(`像${idx === 0 ? '₁' : '₂'}（视位置）μ=${r.mu.toFixed(2)}`, appX + 6, srcY + (idx === 0 ? -7 : 14));
+      }
+      if (idx === 0) {
+        ctx.fillStyle = 'rgba(125,211,252,0.85)';
+        ctx.font = '10.5px sans-serif';
+        ctx.fillText('光线偏折', kink.x + 8, kink.y - 8);
+      }
+    });
+
+    // 光子动画（沿折线）
+    const polyAt = (pts, s) => {
+      const segs = [];
+      let L = 0;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const d = Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
+        segs.push(d); L += d;
+      }
+      let target = s * L;
+      for (let i = 0; i < segs.length; i++) {
+        if (target <= segs[i] || i === segs.length - 1) {
+          const t = segs[i] ? target / segs[i] : 0;
+          return { x: pts[i].x + (pts[i + 1].x - pts[i].x) * t, y: pts[i].y + (pts[i + 1].y - pts[i].y) * t };
+        }
+        target -= segs[i];
+      }
+    };
+    rays.forEach((r, idx) => {
+      const pts = [{ x: src.x, y: src.y }, { x: r.kx, y: lensY }, { x: obs.x, y: obs.y }];
+      const kPhoton = 0.6 + 0.4 * (r.mu / muMax);
+      for (let j = 0; j < 2; j++) {
+        const s = ((ts / 1200) + idx * 0.5 + j * 0.25) % 1;
+        const pos = polyAt(pts, s);
+        ctx.globalAlpha = 0.35 + 0.6 * Math.sin(s * Math.PI);
+        ctx.fillStyle = '#bae6fd';
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, 2.2 * kPhoton, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    });
+
+    ctx.font = '16px sans-serif';
+    ctx.fillText('🔭', obs.x - 9, obsY + 8);
     ctx.font = '12px sans-serif';
-    ctx.fillText(p.q > 0 ? '透镜 = 恒星 + 行星（不可见，沿轨迹运动）' : '透镜恒星（不可见，沿轨迹运动）', 12, h - 30);
+    ctx.fillStyle = COL.text;
+    ctx.fillText('观测者（地球）', obs.x + 14, obsY + 4);
 
-    for (const im of evalRes.images) {
-      const r = 2.2 + Math.min(6.5, Math.log2(1 + im.mu) * 1.7);
-      glowDot(ctx, TX(im.z.re), TY(im.z.im), r, COL.image);
-    }
     ctx.fillStyle = COL.image;
-    ctx.fillText(`像 ×${evalRes.images.length}`, 12, 52);
+    ctx.fillText(`像 ×${evalRes.images.length}`, 12, 38);
 
-    glowDot(ctx, src.x, src.y, 6.5, COL.source);
-    ctx.strokeStyle = 'rgba(251,191,36,0.5)';
+    // 源星光变效果：大小与亮度随放大率 A(t) 显著变化（半径∝√流量，白热核心+双层光环）
+    const srcF = Math.max(0.05, window.MLPHYS.modelFlux(p, evalRes.A));
+    const glowK = Math.min(3.4, Math.sqrt(srcF));
+    glowDot(ctx, src.x, src.y, 6.5 * glowK, COL.source);
+    ctx.strokeStyle = `rgba(251,191,36,${Math.min(0.85, 0.25 * glowK).toFixed(2)})`;
     ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.arc(src.x, src.y, 13, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(src.x, src.y, 11 * glowK, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = `rgba(251,191,36,${Math.min(0.5, 0.14 * glowK).toFixed(2)})`;
+    ctx.beginPath(); ctx.arc(src.x, src.y, 20 * glowK, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = `rgba(255, 252, 235, ${Math.min(1, 0.25 + 0.3 * glowK).toFixed(2)})`;
+    ctx.beginPath(); ctx.arc(src.x, src.y, 6.5 * glowK * 0.42, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = COL.source;
     ctx.font = '12px sans-serif';
-    ctx.fillText('源星（固定于光轴中心）', src.x + 16, src.y - 12);
+    ctx.fillText(`源星（背景恒星）· A=${evalRes.A.toFixed(2)}`, src.x + 16, src.y - 12);
   }
 }
 
@@ -315,7 +305,7 @@ class FindingChart {
     }
   }
 
-  draw(uMin) {
+  draw(evalRes, p) {
     const { ctx, w, h } = setupCanvas(this.canvas);
     ctx.fillStyle = '#070b14';
     ctx.fillRect(0, 0, w, h);
@@ -330,28 +320,27 @@ class FindingChart {
     ctx.globalAlpha = 1;
 
     const cx = w / 2, cy = h / 2;
-    const ringR = 32;
 
-    ctx.strokeStyle = 'rgba(74,222,128,0.95)';
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.fillStyle = COL.source;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(251,191,36,0.35)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 9, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.fillStyle = 'rgba(74,222,128,0.85)';
+    // ── 静态 mock 层：爱因斯坦环参考位置 + 源星标记 ──
+    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = 'rgba(74, 222, 128, 0.9)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(cx, cy, 32, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(74, 222, 128, 0.85)';
     ctx.font = '10px sans-serif';
-    ctx.fillText('源星', cx + ringR + 4, cy - 4);
+    ctx.fillText('爱因斯坦环参考位置', cx + 36, cy - 28);
+    glowDot(ctx, cx, cy, 6, COL.source);
+    ctx.fillStyle = COL.source;
+    ctx.fillText('源星', cx + 13, cy + 18);
 
+    const tau = evalRes.tau, uMin = p.uMin;
+    const maxSpan = Math.max(Math.abs(p.t0 / p.tE), Math.abs((window.MLPHYS.SEASON_DAYS - p.t0) / p.tE)) + 0.6;
+    const kM = (w / 2 - 14) / maxSpan;
+    const lensX = cx + tau * kM;
+    const lensY = cy + uMin * kM;
+
+    // 光轴（源-观测者连线，即无透镜时的直线路径）
     ctx.strokeStyle = 'rgba(125,211,252,0.45)';
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 3]);
@@ -360,6 +349,44 @@ class FindingChart {
     ctx.moveTo(cx, 8); ctx.lineTo(cx, h - 8);
     ctx.stroke();
     ctx.setLineDash([]);
+
+    // 透镜轨迹
+    ctx.strokeStyle = 'rgba(71, 85, 105, 0.8)';
+    ctx.beginPath(); ctx.moveTo(10, lensY); ctx.lineTo(w - 10, lensY); ctx.stroke();
+
+    // 爱因斯坦环（围绕透镜，对齐时套住源）
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = 'rgba(139, 155, 180, 0.8)';
+    ctx.beginPath(); ctx.arc(lensX, lensY, kM, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // u 连线（源 → 透镜）
+    ctx.setLineDash([2, 3]);
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(lensX, lensY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 透镜 ×
+    ctx.strokeStyle = COL.lens;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(lensX - 5, lensY - 5); ctx.lineTo(lensX + 5, lensY + 5);
+    ctx.moveTo(lensX - 5, lensY + 5); ctx.lineTo(lensX + 5, lensY - 5);
+    ctx.stroke();
+    ctx.fillStyle = COL.textBright;
+    ctx.font = '10px sans-serif';
+    ctx.fillText('透镜', lensX + 7, lensY + 3);
+
+    // 像（蓝点，大小∝放大率；相对源的位置 = (τ−z.re, z.im−uMin) 的镜像）
+    for (const im of evalRes.images) {
+      const px = cx + (tau - im.z.re) * kM;
+      const py = cy - (im.z.im - uMin) * kM;
+      ctx.fillStyle = COL.image;
+      ctx.beginPath(); ctx.arc(px, py, 1.6 + Math.min(2.6, Math.sqrt(im.mu)), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = COL.image;
+    ctx.font = '10px sans-serif';
+    ctx.fillText(`像 ×${evalRes.images.length}`, 8, 14);
 
     ctx.fillStyle = COL.text;
     ctx.font = '10px sans-serif';
@@ -370,7 +397,7 @@ class FindingChart {
 
     ctx.fillStyle = COL.textBright;
     ctx.font = '10.5px sans-serif';
-    ctx.fillText('Finding Chart · 5″×5″ 视场', 8, h - 8);
+    ctx.fillText('Finding Chart · mock＋动态投影 · 5″×5″ 视场', 8, h - 8);
   }
 }
 

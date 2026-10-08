@@ -185,7 +185,7 @@ const App = {
 
     this.sysView.setParams(displayP);
     this.sysView.draw(displayP, ev, this.playing ? ts : 0);
-    this.findingView.draw(displayP.uMin);
+    this.findingView.draw(ev, displayP);
     this.curveView.draw({ t: this.t });
 
     if (ts - this.lastReadout > 150) {

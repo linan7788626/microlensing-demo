@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>微透镜侦探 — 引力微透镜光变曲线互动演示</title>
-  <link rel="stylesheet" href="css/style.css?v=11">
+  <link rel="stylesheet" href="css/style.css?v=17">
 </head>
 <body>
   <header class="topbar">
@@ -17,7 +17,7 @@
   <main class="grid">
     <section class="col main-col">
       <div class="panel">
-        <h3>光路与透镜系统（源居中 · 单位 R_E）</h3>
+        <h3>光线偏折侧视图（源星 → 透镜平面 → 观测者）</h3>
         <canvas id="system-canvas" width="640" height="640"></canvas>
       </div>
       <div class="panel">
@@ -48,17 +48,9 @@
 
     <section class="col side-col">
       <div class="panel">
-        <h3>图像视图 · 目标天区</h3>
-        <div class="finding-row">
-          <canvas id="finding-canvas" width="280" height="220"></canvas>
-          <div class="finding-info">
-            <div class="finding-title">OGLE 2003-BLG-235 / MOA 2003-BLG-53<span>（示意）</span></div>
-            <div class="finding-line"><b>天区</b> RA 17h 56m · Dec −29° 32′（银心方向）</div>
-            <div class="finding-line"><b>绿圈</b> 投影爱因斯坦环 ≈ <span id="ring-arcsec">—</span></div>
-            <div class="finding-line"><b>基线星等</b> I ≈ 17.8（参考）</div>
-            <div class="finding-tip">微透镜巡天靠每天比较同一片星场里几万颗星的亮度来"报警"。</div>
-          </div>
-        </div>
+        <h3>投影视图（源居中 · 透镜运动）</h3>
+        <canvas id="finding-canvas" width="280" height="220"></canvas>
+        <div class="finding-cap">目标天区示意（mock）· 绿虚线＝爱因斯坦环参考位置 · 蓝点＝像（大小∝放大率）</div>
       </div>
       <div class="panel">
         <h3>参数调整栏</h3>
@@ -69,7 +61,7 @@
         </div>
         <div class="slider-row">
           <label>u_min 最小间距</label>
-          <input id="slider-umin" type="range" min="0.02" max="1.5" step="0.01" value="0.15">
+          <input id="slider-umin" type="range" min="0.001" max="1.5" step="0.001" value="0.15">
           <span id="val-umin">0.15 R_E</span>
         </div>
         <div class="slider-row">
@@ -109,14 +101,12 @@
       </div>
       <div class="panel">
         <h3>图例</h3>
-        <ul class="legend-list">
-          <li><span class="dot src"></span>源星（背景恒星）</li>
-          <li><span class="dot img"></span>源的像（蓝）</li>
-          <li><span class="dot lens"></span>透镜 ×（不可见）</li>
-          <li><span class="dot ring"></span>爱因斯坦环 R_E</li>
-          <li><span class="dot cau"></span>焦散线（源平面，双透镜）</li>
-          <li><span class="dot crit"></span>临界曲线（像平面，双透镜）</li>
-          <li><span class="dot ray"></span>弯曲光线 → 🔭 观测者</li>
+<ul class="legend-list">
+          <li><span class="dot src"></span>源星（背景恒星，顶部固定）</li>
+          <li><span class="dot lens"></span>透镜 ×（透镜平面，不可见）</li>
+          <li><span class="dot ray"></span>蓝色光线：粗细∝像的放大率 μ → 🔭</li>
+          <li><span class="dot crit"></span>蓝色虚线：像的视位置（反向延长）</li>
+          <li><span class="dot ring"></span>视线（光轴）＝无透镜时的直线路径</li>
         </ul>
         <p class="tip">u 越小，光线弯折越强，源被放大得越亮；双透镜的焦散线会让放大率剧烈跳变。</p>
       </div>
@@ -137,11 +127,11 @@
 
   <div id="toast-area" class="toast-area"></div>
 
-  <script src="js/physics.js?v=11"></script>
-  <script src="js/knowledge.js?v=11"></script>
-  <script src="js/puzzle.js?v=11"></script>
-  <script src="js/render.js?v=11"></script>
-  <script src="js/ui.js?v=11"></script>
-  <script src="js/main.js?v=11"></script>
+  <script src="js/physics.js?v=17"></script>
+  <script src="js/knowledge.js?v=17"></script>
+  <script src="js/puzzle.js?v=17"></script>
+  <script src="js/render.js?v=17"></script>
+  <script src="js/ui.js?v=17"></script>
+  <script src="js/main.js?v=17"></script>
 </body>
 </html>

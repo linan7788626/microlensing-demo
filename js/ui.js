@@ -16,7 +16,7 @@ const UI = {
       'speed-group', 'readout-u', 'readout-a', 'readout-nimg', 'readout-params',
       'regime-text', 'event-log', 'toast-area', 'modal-gallery', 'gallery-list',
       'gallery-count', 'row-s', 'btn-puzzle', 'puzzle-bar', 'btn-reveal', 'btn-next',
-      'chi2-readout', 'verdict-box', 'event-meta', 'ring-arcsec'];
+      'chi2-readout', 'verdict-box', 'event-meta'];
     for (const id of ids) this.els[id] = document.getElementById(id);
 
     for (const s of ['t0', 'umin', 'te', 'fs', 'q', 's']) {
